@@ -11,7 +11,7 @@ from app.categorizer import CategorizedNotes, categorize_details
 TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "Release Notes.docx"
 NONE_TEXT = "None for this release."
 DEFAULT_SUPPORT = (
-    "For assistance with this release, contact the ACME Technical Support team "
+    "For assistance with this product, contact the ACME Technical Support team "
     "through your standard service desk channel or email support@acme.example.com. "
     "Include the product name, version, and a detailed description of the issue."
 )
