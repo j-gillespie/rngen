@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Release Notes Generator</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background-color: #f9f9f9;
+}
+.form-container {
+  max-width: 600px;
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.form-group {
+  margin-bottom: 15px;
+}
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+input[type="text"], input[type="date"], select, textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+textarea {
+  resize: vertical;
+}
+button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover { background-color: #0056b3; }
+button:disabled { background-color: #aaa; cursor: not-allowed; }
+
+#output-container {
+  display: none;
+  max-width: 900px;
+  margin-top: 30px;
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+#output-container h3 {
+  margin-top: 0;
+}
+.output-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 800px) {
+  .output-layout { grid-template-columns: 1fr; }
+}
+.output-panel h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #555;
+}
+#output, #preview {
+  width: 100%;
+  min-height: 360px;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.6;
+  box-sizing: border-box;
+  background-color: #f9f9f9;
+}
+#output {
+  font-family: Consolas, "Courier New", monospace;
+  resize: vertical;
+}
+#preview {
+  overflow: auto;
+  background: #fff;
+}
+#preview h1 { font-size: 1.4rem; margin: 0 0 0.35em; }
+#preview h2 { font-size: 1.1rem; margin: 0.75em 0 0.2em; }
+#preview p { margin: 0 0 0.45em; }
+#preview ul { margin: 0 0 0.5em; padding-left: 1.4rem; }
+#preview li { margin: 0.1em 0; }
+#error-msg {
+  color: #cc0000;
+  margin-top: 10px;
+  display: none;
+}
+.output-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+</style>
+</head>
+<body>
+
+<div class="form-container">
+  <h2>ACME Product Release Notes</h2>
+  <form id="release-form">
+    <div class="form-group">
+      <label for="product">Product</label>
+      <select id="product" name="product" required>
+        <option value="">Select a solution</option>
+        <option value="Anvil">Anvil</option>
+        <option value="Bird Seed">Bird Seed</option>
+        <option value="Hot Air Balloon">Hot Air Balloon</option>
+        <option value="Paint Kit">Paint Kit</option>
+        <option value="Rocket Skates">Rocket-Powered Roller Skates</option>
+        <option value="Supersonic Rocket">Supersonic Rocket</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="version">Version</label>
+      <input type="text" id="version" name="version" placeholder="e.g., v1.2.0" required>
+    </div>
+
+    <div class="form-group">
+      <label for="release-date">Release Date</label>
+      <input type="date" id="release-date" name="release_date" required>
+    </div>
+
+    <div class="form-group">
+      <label for="details">Details</label>
+      <textarea id="details" name="details" rows="20"
+        placeholder="Provide details for this product release" required></textarea>
+    </div>
+
+    <button type="reset" onclick="clearOutput()">Clear</button>
+    <button type="submit" id="submit-btn">Generate Release Notes</button>
+  </form>
+</div>
+
+<div id="output-container">
+  <h3>Generated Release Notes</h3>
+  <div class="output-layout">
+    <div class="output-panel">
+      <h4>Markdown</h4>
+      <textarea id="output" readonly></textarea>
+    </div>
+    <div class="output-panel">
+      <h4>Preview</h4>
+      <div id="preview"></div>
+    </div>
+  </div>
+  <p id="error-msg"></p>
+  <div class="output-actions">
+    <button onclick="copyOutput()">Copy Markdown</button>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatInline(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function renderMarkdown(markdown) {
+  const lines = markdown.split("\n");
+  let html = "";
+  let inList = false;
+
+  const closeList = () => {
+    if (inList) {
+      html += "</ul>";
+      inList = false;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      closeList();
+      continue;
+    }
+
+    if (line.startsWith("# ")) {
+      closeList();
+      html += `<h1>${formatInline(line.slice(2))}</h1>`;
+    } else if (line.startsWith("## ")) {
+      closeList();
+      html += `<h2>${formatInline(line.slice(3))}</h2>`;
+    } else if (line.startsWith("- ")) {
+      if (!inList) {
+        html += "<ul>";
+        inList = true;
+      }
+      html += `<li>${formatInline(line.slice(2))}</li>`;
+    } else {
+      closeList();
+      html += `<p>${formatInline(line)}</p>`;
+    }
+  }
+
+  closeList();
+  return html;
+}
+
+document.getElementById("release-form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+
+  const product = document.getElementById("product").value;
+  const version = document.getElementById("version").value;
+  const releaseDate = document.getElementById("release-date").value;
+  const details = document.getElementById("details").value;
+
+  const submitBtn = document.getElementById("submit-btn");
+  const outputContainer = document.getElementById("output-container");
+  const outputArea = document.getElementById("output");
+  const preview = document.getElementById("preview");
+  const errorMsg = document.getElementById("error-msg");
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Generating...";
+  outputContainer.style.display = "none";
+  errorMsg.style.display = "none";
+  outputArea.value = "";
+  preview.innerHTML = "";
+
+  try {
+    const response = await fetch(`${API_BASE}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product,
+        version,
+        release_date: releaseDate,
+        details
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || `HTTP ${response.status}`);
+    }
+
+    outputArea.value = data.markdown;
+    preview.innerHTML = renderMarkdown(data.markdown);
+    outputContainer.style.display = "block";
+    outputContainer.scrollIntoView({ behavior: "smooth" });
+  } catch (err) {
+    errorMsg.textContent = "Error: " + err.message;
+    errorMsg.style.display = "block";
+    outputContainer.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Generate Release Notes";
+  }
+});
+
+function copyOutput() {
+  const output = document.getElementById("output");
+  navigator.clipboard.writeText(output.value)
+    .then(() => alert("Copied to clipboard!"))
+    .catch(() => {
+      output.select();
+      alert("Copy failed — please select and copy manually.");
+    });
+}
+
+function clearOutput() {
+  document.getElementById("output-container").style.display = "none";
+  document.getElementById("output").value = "";
+  document.getElementById("preview").innerHTML = "";
+  document.getElementById("error-msg").style.display = "none";
+}
+</script>
+
+</body>
+</html>
