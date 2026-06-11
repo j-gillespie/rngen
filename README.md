@@ -1,4 +1,5 @@
 # rngen
+A failed experiment in which I'd put together a front-end UI and tried to use Cursor (as I was learning it) to add the backend. Ran out of tokens with the free version before I could resolve an issue or two. Made me appreciate the idea of writing Python FIRST for the backend, testing, and THEN using AI to make the whole thing more efficient.
 
 ACME Product Release Notes Generator. A FastAPI backend and web UI that turns raw release details into structured Markdown release notes using the `Release Notes.docx` template.
 
